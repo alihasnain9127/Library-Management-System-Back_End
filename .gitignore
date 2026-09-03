@@ -1,0 +1,109 @@
+node_modules/
+
+# ── Environment & Secrets (CRITICAL: never commit these) ──
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+!.env.sample
+secrets/
+credentials/
+config/secrets.*
+config/*.local.*
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# ── Build & Deployment Artifacts ──
+dist/
+build/
+out/
+coverage/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# ── OS Files ──
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── IDE & Editor ──
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# ── Logs & Diagnostics ──
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# ── Package Manager Lockfiles (keep as needed) ──
+# package-lock.json   # Uncomment to ignore lockfile
+# yarn.lock           # Uncomment to ignore lockfile
+
+# ── Temporary Files ──
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.pid
+uploads/
+static/uploads/
+
+# ── Security Reports (may contain sensitive info) ──
+secrets-scan-report.json
+security-audit-report.json
+npm-audit-report.json
+sast-report.json
+pen-test-report.*
+
+# ── Database dumps & backups ──
+*.sql
+*.dump
+*.backup
+*.bak
+
+# ── Terraform / IaC state files ──
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# ── Testing artifacts ──
+test-results/
+playwright-report/
+playwright/.cache/
+cypress/videos/
+cypress/screenshots/
+
+# ── Local config overrides ──
+/config/
+local/
+dev/
+sandbox/
