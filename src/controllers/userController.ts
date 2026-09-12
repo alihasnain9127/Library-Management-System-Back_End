@@ -131,3 +131,58 @@ export const updateProfile = async (req: any, res: Response) => {
     }
   });
 };
+
+export const createAdmin = async (req: Request, res: Response) => {
+  const { name, email, password, phone } = req.body;
+
+  if (!name || typeof name !== 'string' || name.trim().length === 0) {
+    res.status(400);
+    throw new Error('Full name is required');
+  }
+
+  if (!email || typeof email !== 'string' || email.trim().length === 0) {
+    res.status(400);
+    throw new Error('Email address is required');
+  }
+
+  if (!password || typeof password !== 'string' || password.length < 6) {
+    res.status(400);
+    throw new Error('Password must be at least 6 characters');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const userExists = await User.findOne({ email: normalizedEmail });
+  if (userExists) {
+    res.status(409);
+    throw new Error('An account with this email already exists');
+  }
+
+  const admin = await User.create({
+    name: name.trim(),
+    email: normalizedEmail,
+    password,
+    phone: phone ? String(phone).trim() : undefined,
+    role: 'admin',
+    isActive: true,
+    isSuspended: false,
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Admin account created successfully',
+    data: {
+      _id: admin._id,
+      name: admin.name,
+      email: admin.email,
+      role: admin.role,
+      phone: admin.phone,
+      isActive: admin.isActive,
+      isSuspended: admin.isSuspended,
+      suspensionReasons: admin.suspensionReasons,
+      suspensionEndDate: admin.suspensionEndDate,
+      createdAt: admin.createdAt,
+      updatedAt: admin.updatedAt,
+    }
+  });
+};
+

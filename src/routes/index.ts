@@ -12,6 +12,7 @@ const router = express.Router();
 router.use('/auth', authRoutes);
 router.use('/books', bookRoutes);
 router.use('/borrow', borrowRoutes);
+router.use('/circulation', borrowRoutes);
 router.use('/users', userRoutes);
 router.use('/fines', fineRoutes);
 router.use('/reports', reportRoutes);

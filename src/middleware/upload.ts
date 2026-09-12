@@ -44,3 +44,26 @@ export const upload = multer({
 
 export const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
 export const MAX_UPLOAD_SIZE_MB = 50;
+
+const csvFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const isCsvExt = path.extname(file.originalname).toLowerCase() === '.csv';
+  const isCsvMime = file.mimetype === 'text/csv' ||
+                    file.mimetype === 'application/vnd.ms-excel' ||
+                    file.mimetype === 'text/plain' ||
+                    file.mimetype === 'application/csv';
+
+  if (isCsvExt || isCsvMime) {
+    return cb(null, true);
+  } else {
+    cb(new Error('CSV files only! (.csv)'));
+  }
+};
+
+export const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: csvFileFilter,
+});
+

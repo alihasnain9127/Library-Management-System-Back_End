@@ -273,3 +273,145 @@ export const deleteBook = async (req: Request, res: Response) => {
     message: 'Book removed successfully'
   });
 };
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function parseCsv(content: string): string[][] {
+  const lines = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const rows: string[][] = [];
+  let currentRow = '';
+
+  for (const line of lines) {
+    if (!line.trim() && !currentRow) continue;
+    if (currentRow) {
+      currentRow += '\n' + line;
+    } else {
+      currentRow = line;
+    }
+
+    let quoteCount = 0;
+    for (let i = 0; i < currentRow.length; i++) {
+      if (currentRow[i] === '"') quoteCount++;
+    }
+    if (quoteCount % 2 === 0) {
+      rows.push(parseCsvLine(currentRow));
+      currentRow = '';
+    }
+  }
+  return rows;
+}
+
+export const bulkImportBooks = async (req: Request, res: Response) => {
+  const file = (req as any).file;
+  if (!file || !file.buffer) {
+    res.status(400);
+    throw new Error('No CSV file provided. Please upload a valid CSV file.');
+  }
+
+  const csvContent = file.buffer.toString('utf-8');
+  const rows = parseCsv(csvContent);
+
+  if (rows.length < 2) {
+    res.status(400);
+    throw new Error('CSV file must contain a header row and at least one data row.');
+  }
+
+  const headers = rows[0].map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
+  const titleIdx = headers.findIndex((h) => h === 'title');
+  const authorIdx = headers.findIndex((h) => h === 'author');
+  const categoryIdx = headers.findIndex((h) => h === 'category' || h === 'categories');
+  const isbnIdx = headers.findIndex((h) => h === 'isbn');
+  const publisherIdx = headers.findIndex((h) => h === 'publisher');
+  const publishYearIdx = headers.findIndex((h) => h === 'publishyear' || h === 'year');
+  const descIdx = headers.findIndex((h) => h === 'description' || h === 'desc');
+  const quantityIdx = headers.findIndex((h) => h === 'quantity' || h === 'qty' || h === 'stock');
+  const imageIdx = headers.findIndex((h) => h === 'imageurl' || h === 'image' || h === 'cover');
+
+  if (titleIdx === -1 || authorIdx === -1) {
+    res.status(400);
+    throw new Error("CSV file must have at least 'title' and 'author' column headers.");
+  }
+
+  const VALID_CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Other'];
+  const booksToCreate = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    const title = row[titleIdx]?.trim();
+    const author = row[authorIdx]?.trim();
+
+    if (!title || !author) continue;
+
+    const rawCategory = categoryIdx !== -1 ? row[categoryIdx]?.trim() : '';
+    const matchedCategory = VALID_CATEGORIES.find(
+      (c) => c.toLowerCase() === rawCategory?.toLowerCase()
+    ) as any || 'Other';
+
+    const rawIsbn = isbnIdx !== -1 ? row[isbnIdx]?.replace(/[-\s]/g, '').trim() : '';
+    const isbn = rawIsbn && /^[0-9]{10}([0-9]{3})?$/.test(rawIsbn) ? rawIsbn : undefined;
+
+    const publisher = publisherIdx !== -1 ? row[publisherIdx]?.trim() : undefined;
+    const rawYear = publishYearIdx !== -1 ? parseInt(row[publishYearIdx], 10) : NaN;
+    const publishYear = !isNaN(rawYear) && rawYear >= 1000 && rawYear <= new Date().getFullYear() ? rawYear : undefined;
+    const description = descIdx !== -1 ? row[descIdx]?.trim() : undefined;
+
+    const rawQty = quantityIdx !== -1 ? parseInt(row[quantityIdx], 10) : NaN;
+    const quantity = !isNaN(rawQty) && rawQty > 0 ? rawQty : 1;
+
+    const rawImg = imageIdx !== -1 ? row[imageIdx]?.trim() : '';
+    const imageUrl = rawImg && (rawImg.startsWith('http://') || rawImg.startsWith('https://')) ? rawImg : undefined;
+
+    booksToCreate.push({
+      title,
+      author,
+      category: matchedCategory,
+      categories: [matchedCategory],
+      isbn,
+      publisher,
+      publishYear,
+      description,
+      quantity,
+      available: quantity,
+      imageUrl,
+      bookImage: imageUrl ? { url: imageUrl, uploadedAt: new Date(), path: imageUrl } : undefined,
+      isActive: true,
+    });
+  }
+
+  if (booksToCreate.length === 0) {
+    res.status(400);
+    throw new Error('No valid book records could be extracted from the CSV file.');
+  }
+
+  // Create books in DB
+  const createdBooks = await Book.create(booksToCreate);
+
+  res.status(201).json({
+    success: true,
+    message: `Successfully imported ${createdBooks.length} books into the catalog`,
+    data: createdBooks
+  });
+};
+

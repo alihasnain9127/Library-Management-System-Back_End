@@ -221,6 +221,11 @@ export const returnBook = async (req: AuthRequest, res: Response, next: NextFunc
       $inc: { totalBooksReturned: 1 }
     });
 
+    await borrow.populate([
+      { path: 'bookId', select: 'title author bookImage' },
+      { path: 'userId', select: 'name email' }
+    ]);
+
     res.json({
       success: true,
       message: 'Book returned successfully',
@@ -282,6 +287,11 @@ export const payFine = async (req: Request, res: Response, next: NextFunction) =
     await borrow.save();
 
     await Fine.findOneAndUpdate({ borrowId: borrow._id }, { status: 'paid', paymentDate: new Date() });
+
+    await borrow.populate([
+      { path: 'bookId', select: 'title author bookImage' },
+      { path: 'userId', select: 'name email' }
+    ]);
 
     res.json({
       success: true,
