@@ -1,10 +1,12 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Book } from '../models/Book.js';
+import { STANDARD_CATEGORIES } from '../models/Category.js';
 
 export const getBooks = async (req: Request, res: Response) => {
   const { search, category, available, page, limit, sort } = req.query as {
     search?: string;
-    category?: 'All' | 'Fiction' | 'Non-Fiction' | 'Science' | 'History' | 'Technology' | 'Other';
+    category?: string;
     available?: boolean;
     page?: number;
     limit?: number;
@@ -77,7 +79,16 @@ export const getBooks = async (req: Request, res: Response) => {
 };
 
 export const getBookById = async (req: Request, res: Response) => {
-  const book = await Book.findById(req.params.id);
+  const { id } = req.params;
+  if (!id || typeof id !== 'string' || !mongoose.Types.ObjectId.isValid(id)) {
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
+    return;
+  }
+
+  const book = await Book.findById(id);
 
   if (book) {
     res.json({
@@ -85,8 +96,10 @@ export const getBookById = async (req: Request, res: Response) => {
       data: book
     });
   } else {
-    res.status(404);
-    throw new Error('Book not found');
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
   }
 };
 
@@ -160,13 +173,25 @@ export const addBook = async (req: Request, res: Response) => {
 };
 
 export const updateBook = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (!id || typeof id !== 'string' || !mongoose.Types.ObjectId.isValid(id)) {
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
+    return;
+  }
+
   const { title, author, category, categories, isbn, publisher, publishYear, description, quantity, imageUrl, bookImage } = req.body;
 
-  const book = await Book.findById(req.params.id);
+  const book = await Book.findById(id);
 
   if (!book) {
-    res.status(404);
-    throw new Error('Book not found');
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
+    return;
   }
 
   if (quantity !== undefined) {
@@ -252,11 +277,23 @@ export const updateBook = async (req: Request, res: Response) => {
 };
 
 export const deleteBook = async (req: Request, res: Response) => {
-  const book = await Book.findById(req.params.id);
+  const { id } = req.params;
+  if (!id || typeof id !== 'string' || !mongoose.Types.ObjectId.isValid(id)) {
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
+    return;
+  }
+
+  const book = await Book.findById(id);
 
   if (!book) {
-    res.status(404);
-    throw new Error('Book not found');
+    res.status(404).json({
+      success: false,
+      message: 'Book not found'
+    });
+    return;
   }
 
   // Check if book is currently issued
@@ -354,7 +391,6 @@ export const bulkImportBooks = async (req: Request, res: Response) => {
     throw new Error("CSV file must have at least 'title' and 'author' column headers.");
   }
 
-  const VALID_CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Other'];
   const booksToCreate = [];
 
   for (let i = 1; i < rows.length; i++) {
@@ -365,9 +401,9 @@ export const bulkImportBooks = async (req: Request, res: Response) => {
     if (!title || !author) continue;
 
     const rawCategory = categoryIdx !== -1 ? row[categoryIdx]?.trim() : '';
-    const matchedCategory = VALID_CATEGORIES.find(
-      (c) => c.toLowerCase() === rawCategory?.toLowerCase()
-    ) as any || 'Other';
+    const matchedCategory =
+      STANDARD_CATEGORIES.find((c) => c.toLowerCase() === rawCategory?.toLowerCase()) ||
+      (rawCategory && rawCategory.length <= 50 ? rawCategory : 'Other');
 
     const rawIsbn = isbnIdx !== -1 ? row[isbnIdx]?.replace(/[-\s]/g, '').trim() : '';
     const isbn = rawIsbn && /^[0-9]{10}([0-9]{3})?$/.test(rawIsbn) ? rawIsbn : undefined;
@@ -414,4 +450,3 @@ export const bulkImportBooks = async (req: Request, res: Response) => {
     data: createdBooks
   });
 };
-

@@ -1,10 +1,14 @@
 import mongoose, { Document, Schema } from 'mongoose';
+import { STANDARD_CATEGORIES, StandardCategory } from './Category.js';
+
+export const VALID_CATEGORIES = STANDARD_CATEGORIES;
+export type BookCategory = StandardCategory | string;
 
 export interface IBook extends Document {
   title: string;
   author: string;
-  category: 'Fiction' | 'Non-Fiction' | 'Science' | 'History' | 'Technology' | 'Other';
-  categories: Array<'Fiction' | 'Non-Fiction' | 'Science' | 'History' | 'Technology' | 'Other'>;
+  category: BookCategory;
+  categories: BookCategory[];
   isbn?: string;
   publisher?: string;
   publishYear?: number;
@@ -25,22 +29,31 @@ export interface IBook extends Document {
   updatedAt: Date;
 }
 
-const VALID_CATEGORIES = ['Fiction', 'Non-Fiction', 'Science', 'History', 'Technology', 'Other'] as const;
-
 const bookSchema = new Schema<IBook>({
   title: { type: String, required: true, trim: true, maxlength: 200 },
   author: { type: String, required: true, trim: true, maxlength: 100 },
   category: {
     type: String,
-    required: true,
-    enum: VALID_CATEGORIES,
+    required: [true, 'Category is required'],
+    trim: true,
+    maxlength: [50, 'Category cannot exceed 50 characters'],
     default: 'Other',
+    validate: {
+      validator: (val: string) => typeof val === 'string' && val.trim().length > 0 && val.trim().length <= 50,
+      message: 'Category must be a non-empty string up to 50 characters',
+    },
   },
   categories: {
     type: [String],
     required: true,
-    enum: VALID_CATEGORIES,
     default: ['Other'],
+    validate: {
+      validator: (cats: string[]) =>
+        Array.isArray(cats) &&
+        cats.length > 0 &&
+        cats.every((c) => typeof c === 'string' && c.trim().length > 0 && c.trim().length <= 50),
+      message: 'Categories must contain at least one valid category name',
+    },
   },
   isbn: {
     type: String,
@@ -92,13 +105,28 @@ const bookSchema = new Schema<IBook>({
 bookSchema.pre('save', function preSaveSyncImageFields() {
   const book = this as any;
   if (book.categories && Array.isArray(book.categories) && book.categories.length > 0) {
-    const primaryCategory = book.categories.find((c: string) => (VALID_CATEGORIES as readonly string[]).includes(c));
+    const cleaned = Array.from(
+      new Set(
+        book.categories
+          .map((c: any) => (typeof c === 'string' ? c.trim() : ''))
+          .filter(Boolean)
+      )
+    );
+    book.categories = cleaned.length > 0 ? cleaned : ['Other'];
+
+    const primaryCategory = book.categories.find((c: string) =>
+      STANDARD_CATEGORIES.some((sc) => sc.toLowerCase() === c.toLowerCase())
+    );
+
     if (primaryCategory && (!book.category || book.category === 'Other')) {
       book.category = primaryCategory;
+    } else if (!book.category) {
+      book.category = book.categories[0] || 'Other';
     }
-    book.categories = Array.from(new Set(book.categories));
   } else if (book.category) {
-    book.categories = [book.category as string | undefined];
+    const trimmed = String(book.category).trim();
+    book.category = trimmed || 'Other';
+    book.categories = [book.category];
   } else {
     book.categories = ['Other'];
     book.category = 'Other';
